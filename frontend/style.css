@@ -482,3 +482,170 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   pointer-events: auto;
 }
  
+/* ===== Professional polish ===== */
+html { scroll-behavior: smooth; }
+ 
+::selection {
+  background: var(--accent-glow);
+  color: var(--text-primary);
+}
+ 
+/* Subtle depth on cards/bubbles */
+.login-card, .message-row.assistant .bubble {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+ 
+/* Smoother disabled states */
+button:disabled { cursor: not-allowed; opacity: 0.6; }
+ 
+/* Prevent text from being selected on interactive chrome (buttons, icons) */
+button, .status-dot, .wifi-icon, .avatar {
+  -webkit-tap-highlight-color: transparent;
+}
+ 
+/* Slightly refined scrollbar for Firefox too */
+* { scrollbar-width: thin; scrollbar-color: var(--bg-surface-2) transparent; }
+ 
+/* Subtle entrance for the whole app after splash */
+.app-shell, .login-screen { animation: appFadeIn 0.4s ease; }
+@keyframes appFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+ 
+/* Safe-area padding for notched phones */
+.input-bar { margin-bottom: max(4px, env(safe-area-inset-bottom)); }
+.chat-header { padding-top: max(12px, env(safe-area-inset-top)); }
+ 
+/* ===== Login button spinner ===== */
+.btn-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: #1f1f1f;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+ 
+/* ===== Code blocks with copy button ===== */
+.code-block { position: relative; margin: 10px 0; }
+.code-block pre { margin: 0; }
+.copy-code-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.code-block:hover .copy-code-btn { opacity: 1; }
+.copy-code-btn:hover { color: var(--text-primary); }
+ 
+/* ===== Message copy button ===== */
+.message-row.assistant .bubble { position: relative; padding-bottom: 30px; }
+.msg-copy-btn {
+  position: absolute;
+  bottom: 6px; right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+.message-row.assistant:hover .msg-copy-btn { opacity: 1; }
+.msg-copy-btn:hover { color: var(--text-primary); background: var(--bg-surface-2); }
+ 
+/* ===== Scroll-to-bottom floating button ===== */
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 5;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.scroll-bottom-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.scroll-bottom-btn:hover { background: var(--accent); color: #fff; }
+.chat-main { position: relative; }
+ 
+/* ===== Heading / list formatting inside AI messages ===== */
+.bubble h2, .bubble h3, .bubble h4 {
+  font-family: var(--font-display);
+  margin: 10px 0 6px;
+  line-height: 1.3;
+}
+.bubble h2 { font-size: 18px; }
+.bubble h3 { font-size: 16px; }
+.bubble h4 { font-size: 14.5px; }
+.bubble ul { margin: 6px 0; padding-left: 20px; }
+.bubble li { margin: 3px 0; }
+ 
+/* ===== Message timestamp ===== */
+.msg-time {
+  display: block;
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.message-row:hover .msg-time { opacity: 1; }
+.message-row.user .msg-time { text-align: right; }
+ 
+/* ===== Message action buttons (copy + regenerate) ===== */
+.msg-actions {
+  position: absolute;
+  bottom: 6px; right: 10px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.message-row.assistant:hover .msg-actions { opacity: 1; }
+.msg-action-btn {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+}
+.msg-action-btn:hover { color: var(--text-primary); background: var(--bg-surface-2); }
+ 
+/* ===== Rename chat input ===== */
+.rename-input {
+  flex: 1;
+  background: var(--bg-deep);
+  border: 1px solid var(--accent-dim);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-body);
+  padding: 4px 6px;
+  border-radius: 6px;
+  outline: none;
+  min-width: 0;
+}
+ 
