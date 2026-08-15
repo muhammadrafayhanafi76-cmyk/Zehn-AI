@@ -77,8 +77,16 @@ setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 2100);
  
 // ===== Auth wiring =====
 googleLoginBtn.addEventListener("click", () => {
-  if (window.zehnLogin) window.zehnLogin();
+  googleLoginBtn.disabled = true;
+  googleLoginBtn.innerHTML = `<span class="btn-spinner"></span> Signing in...`;
+  if (window.zehnLogin) {
+    window.zehnLogin().finally(() => {
+      googleLoginBtn.disabled = false;
+      googleLoginBtn.innerHTML = googleLoginBtnOriginalHTML;
+    });
+  }
 });
+const googleLoginBtnOriginalHTML = googleLoginBtn.innerHTML;
  
 logoutBtn.addEventListener("click", () => {
   if (window.zehnLogout) window.zehnLogout();
@@ -152,6 +160,10 @@ function renderHistoryList() {
       e.stopPropagation();
       deleteChat(chat.id);
     });
+    item.querySelector(".title-text").addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      renameChat(chat.id, item);
+    });
     historyList.appendChild(item);
   });
 }
@@ -172,6 +184,33 @@ function deleteChat(id) {
   } else {
     renderHistoryList();
   }
+}
+ 
+function renameChat(id, itemEl) {
+  const chat = allChats.find((c) => c.id === id);
+  if (!chat) return;
+  const titleSpan = itemEl.querySelector(".title-text");
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "rename-input";
+  input.value = chat.title;
+  titleSpan.replaceWith(input);
+  input.focus();
+  input.select();
+ 
+  function commit() {
+    const newTitle = input.value.trim();
+    chat.title = newTitle || chat.title;
+    saveChatsToStorage();
+    renderHistoryList();
+    if (id === activeChatId) headerTitle.textContent = chat.title;
+  }
+ 
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.value = chat.title; input.blur(); }
+  });
 }
  
 // ===== Chat lifecycle =====
@@ -204,7 +243,7 @@ function renderMessages() {
     welcomeScreen.style.flexDirection = "column";
     return;
   }
-  chat.messages.forEach((m) => addMessage(m.role, m.text));
+  chat.messages.forEach((m) => addMessage(m.role, m.text, m.time));
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
  
@@ -225,7 +264,13 @@ sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   sidebar.classList.toggle("open");
   syncSidebarOverlay();
+  localStorage.setItem("zehn_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
 });
+ 
+// Restore sidebar state on desktop
+if (window.innerWidth > 760 && localStorage.getItem("zehn_sidebar_collapsed") === "1") {
+  sidebar.classList.add("collapsed");
+}
  
 // ===== Mobile: tap outside sidebar to close it =====
 const sidebarOverlay = document.createElement("div");
@@ -287,6 +332,21 @@ document.addEventListener("keydown", (e) => {
   const isModifier = e.ctrlKey || e.metaKey || e.altKey;
   const isPrintable = e.key.length === 1;
  
+  // Ctrl/Cmd + N -> new chat
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n" && !appShell.classList.contains("hidden")) {
+    e.preventDefault();
+    startNewChat();
+    return;
+  }
+ 
+  // Escape -> close mobile sidebar, blur input
+  if (e.key === "Escape") {
+    sidebar.classList.remove("open");
+    syncSidebarOverlay();
+    userInput.blur();
+    return;
+  }
+ 
   if (!isTyping && !isModifier && isPrintable && !appShell.classList.contains("hidden")) {
     userInput.focus();
   }
@@ -318,8 +378,9 @@ inputForm.addEventListener("submit", async (e) => {
     headerTitle.textContent = chat.title;
   }
  
-  addMessage("user", text);
-  chat.messages.push({ role: "user", text });
+  const userTime = Date.now();
+  addMessage("user", text, userTime);
+  chat.messages.push({ role: "user", text, time: userTime });
   saveChatsToStorage();
   renderHistoryList();
  
@@ -334,7 +395,7 @@ inputForm.addEventListener("submit", async (e) => {
     const reply = await callBackend(chat.messages);
     statusEl.remove();
     await addMessageTyped("assistant", reply);
-    chat.messages.push({ role: "assistant", text: reply });
+    chat.messages.push({ role: "assistant", text: reply, time: Date.now() });
     saveChatsToStorage();
     statusDot.classList.remove("offline");
   } catch (err) {
@@ -363,7 +424,7 @@ function assistantAvatarSVG() {
   return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.5"/></svg>`;
 }
  
-function addMessage(role, text) {
+function addMessage(role, text, time) {
   const row = document.createElement("div");
   row.className = `message-row ${role}`;
  
@@ -381,12 +442,47 @@ function addMessage(role, text) {
   bubble.className = "bubble";
   bubble.innerHTML = formatText(text);
  
+  if (time) {
+    const ts = document.createElement("span");
+    ts.className = "msg-time";
+    ts.textContent = new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    bubble.appendChild(ts);
+  }
+ 
   if (role === "assistant") {
     row.appendChild(avatar);
     row.appendChild(bubble);
   } else {
     row.appendChild(bubble);
     row.appendChild(avatar);
+  }
+ 
+  if (role === "assistant") {
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "msg-actions";
+ 
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "msg-action-btn";
+    copyBtn.title = "Copy response";
+    copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M2 9V2.5A0.5 0.5 0 0 1 2.5 2H9" stroke="currentColor" stroke-width="1.1"/></svg>`;
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 6.5L5 9L10.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        setTimeout(() => {
+          copyBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M2 9V2.5A0.5 0.5 0 0 1 2.5 2H9" stroke="currentColor" stroke-width="1.1"/></svg>`;
+        }, 1500);
+      });
+    });
+ 
+    const regenBtn = document.createElement("button");
+    regenBtn.className = "msg-action-btn";
+    regenBtn.title = "Regenerate response";
+    regenBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5a4.5 4.5 0 0 1 7.5-3.3M11 6.5a4.5 4.5 0 0 1-7.5 3.3M9 2v2h-2M4 11v-2h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    regenBtn.addEventListener("click", () => regenerateResponse(row));
+ 
+    actionsRow.appendChild(copyBtn);
+    actionsRow.appendChild(regenBtn);
+    bubble.appendChild(actionsRow);
   }
  
   chatWindow.appendChild(row);
@@ -465,11 +561,96 @@ function escapeOnly(text) {
  
 function formatText(text) {
   let escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  escaped = escaped.replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`);
-  escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+ 
+  // Fenced code blocks (with copy button)
+  let codeBlockIndex = 0;
+  const codeBlocks = [];
+  escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    codeBlocks.push(code.trim());
+    return `__CODEBLOCK_${codeBlockIndex++}__`;
+  });
+ 
+  // Headings
+  escaped = escaped.replace(/^### (.+)$/gm, "<h4>$1</h4>");
+  escaped = escaped.replace(/^## (.+)$/gm, "<h3>$1</h3>");
+  escaped = escaped.replace(/^# (.+)$/gm, "<h2>$1</h2>");
+ 
+  // Bold / inline code
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+ 
+  // Bullet lists
+  escaped = escaped.replace(/^(?:- |\* )(.+)$/gm, "<li>$1</li>");
+  escaped = escaped.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
+ 
+  // Restore code blocks with copy button wrapper
+  codeBlocks.forEach((code, i) => {
+    const escapedCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const block = `<div class="code-block"><button class="copy-code-btn" data-code="${encodeURIComponent(code)}">Copy</button><pre><code>${escapedCode}</code></pre></div>`;
+    escaped = escaped.replace(`__CODEBLOCK_${i}__`, block);
+  });
+ 
   return escaped;
 }
+ 
+// ===== Regenerate last assistant response =====
+async function regenerateResponse(rowEl) {
+  const chat = getActiveChat();
+  if (!chat || isLoading) return;
+ 
+  // Remove the last assistant message from data + DOM
+  const lastMsg = chat.messages[chat.messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "assistant") return;
+  chat.messages.pop();
+  rowEl.remove();
+  saveChatsToStorage();
+ 
+  const lastUser = [...chat.messages].reverse().find((m) => m.role === "user");
+  const willSearch = lastUser ? looksLikeSearch(lastUser.text) : false;
+  const statusEl = addStatusIndicator(willSearch);
+  setLoading(true);
+ 
+  try {
+    const reply = await callBackend(chat.messages);
+    statusEl.remove();
+    await addMessageTyped("assistant", reply);
+    chat.messages.push({ role: "assistant", text: reply, time: Date.now() });
+    saveChatsToStorage();
+    statusDot.classList.remove("offline");
+  } catch (err) {
+    statusEl.remove();
+    addMessage("assistant", "⚠️ Sorry, I couldn't regenerate a response. Please try again.", Date.now());
+    statusDot.classList.add("offline");
+  } finally {
+    setLoading(false);
+  }
+}
+ 
+// ===== Copy-code button delegation (works for all code blocks) =====
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".copy-code-btn");
+  if (!btn) return;
+  const code = decodeURIComponent(btn.dataset.code);
+  navigator.clipboard.writeText(code).then(() => {
+    const original = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  });
+});
+ 
+// ===== Scroll-to-bottom floating button =====
+const scrollBtn = document.createElement("button");
+scrollBtn.className = "scroll-bottom-btn";
+scrollBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+scrollBtn.addEventListener("click", () => {
+  chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: "smooth" });
+});
+document.querySelector(".chat-main").appendChild(scrollBtn);
+ 
+chatWindow.addEventListener("scroll", () => {
+  const nearBottom = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 120;
+  scrollBtn.classList.toggle("visible", !nearBottom);
+});
  
 async function callBackend(messages) {
   const res = await fetch(`${BACKEND_URL}/api/chat`, {
