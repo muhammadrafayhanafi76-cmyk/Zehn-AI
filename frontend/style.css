@@ -455,3 +455,30 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   100% { background-position: -200% center; }
 }
  
+/* ===== WiFi status icon ===== */
+.wifi-icon {
+  display: flex;
+  align-items: center;
+  color: #3FE08A;
+  transition: color 0.2s;
+}
+.status-dot.offline ~ .wifi-icon,
+#statusDot.offline + .wifi-icon {
+  color: #ff6b6b;
+}
+ 
+/* ===== Mobile sidebar overlay (tap outside to close) ===== */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 15;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.sidebar-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+ 
