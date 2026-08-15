@@ -1,5 +1,5 @@
  // ===== CONFIG =====
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "https://zehn-ai-backend.vercel.app";
  
 // Mirror of backend's search trigger keywords (for showing "Searching the web..." live)
 const SEARCH_TRIGGERS = [
@@ -53,6 +53,24 @@ const sidebarToggle = document.getElementById("sidebarToggle");
 const headerTitle = document.getElementById("headerTitle");
 const statusDot = document.getElementById("statusDot");
 const historyList = document.getElementById("historyList");
+ 
+// ===== Online / offline detection =====
+const wifiIcon = document.getElementById("wifiIcon");
+ 
+function updateConnectionStatus() {
+  if (!navigator.onLine) {
+    statusDot.classList.add("offline");
+    statusDot.title = "No internet connection";
+    if (wifiIcon) { wifiIcon.style.color = "#ff6b6b"; wifiIcon.title = "No internet connection"; }
+  } else {
+    statusDot.classList.remove("offline");
+    statusDot.title = "Connected";
+    if (wifiIcon) { wifiIcon.style.color = "#3FE08A"; wifiIcon.title = "Connected"; }
+  }
+}
+window.addEventListener("online", updateConnectionStatus);
+window.addEventListener("offline", updateConnectionStatus);
+updateConnectionStatus();
  
 // Remove splash from the DOM after its animation finishes
 setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 2100);
@@ -206,7 +224,61 @@ userInput.addEventListener("keydown", (e) => {
 sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   sidebar.classList.toggle("open");
+  syncSidebarOverlay();
 });
+ 
+// ===== Mobile: tap outside sidebar to close it =====
+const sidebarOverlay = document.createElement("div");
+sidebarOverlay.className = "sidebar-overlay";
+document.body.appendChild(sidebarOverlay);
+ 
+function syncSidebarOverlay() {
+  if (sidebar.classList.contains("open") && window.innerWidth <= 760) {
+    sidebarOverlay.classList.add("visible");
+  } else {
+    sidebarOverlay.classList.remove("visible");
+  }
+}
+ 
+sidebarOverlay.addEventListener("click", () => {
+  sidebar.classList.remove("open");
+  syncSidebarOverlay();
+});
+ 
+// ===== Mobile: swipe gestures to open/close sidebar =====
+let touchStartX = 0;
+let touchStartY = 0;
+ 
+document.addEventListener("touchstart", (e) => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+ 
+document.addEventListener("touchend", (e) => {
+  if (window.innerWidth > 760) return; // only on mobile widths
+ 
+  const touchEndX = e.changedTouches[0].clientX;
+  const touchEndY = e.changedTouches[0].clientY;
+  const deltaX = touchEndX - touchStartX;
+  const deltaY = touchEndY - touchStartY;
+ 
+  // Ignore mostly-vertical swipes (scrolling)
+  if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+ 
+  const isOpen = sidebar.classList.contains("open");
+ 
+  // Swipe right from near the left edge to open
+  if (!isOpen && touchStartX < 40 && deltaX > 60) {
+    sidebar.classList.add("open");
+    syncSidebarOverlay();
+  }
+ 
+  // Swipe left anywhere while open to close
+  if (isOpen && deltaX < -60) {
+    sidebar.classList.remove("open");
+    syncSidebarOverlay();
+  }
+}, { passive: true });
  
 // Auto-focus input when typing anywhere on the page
 document.addEventListener("keydown", (e) => {
@@ -267,8 +339,16 @@ inputForm.addEventListener("submit", async (e) => {
     statusDot.classList.remove("offline");
   } catch (err) {
     statusEl.remove();
-    addMessage("assistant", "⚠️ Sorry, I couldn't respond right now. Please check if the backend is running.\n\n(Error: " + err.message + ")");
-    statusDot.classList.add("offline");
+    let friendlyMessage;
+    if (!navigator.onLine) {
+      friendlyMessage = "⚠️ You're offline. Please check your internet connection and try again.";
+    } else if (err.message && err.message.toLowerCase().includes("fetch")) {
+      friendlyMessage = "⚠️ Couldn't reach Zehn AI's server. This is usually an internet connection issue — please check your connection and try again. If your internet is working fine, the backend server may not be running.";
+    } else {
+      friendlyMessage = "⚠️ Something went wrong: " + err.message;
+    }
+    addMessage("assistant", friendlyMessage);
+    updateConnectionStatus();
   } finally {
     setLoading(false);
   }
