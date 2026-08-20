@@ -73,7 +73,7 @@ window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
  
 // Remove splash from the DOM after its animation finishes
-setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 2100);
+setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 1600);
  
 // ===== Auth wiring =====
 googleLoginBtn.addEventListener("click", () => {
@@ -531,9 +531,9 @@ function addMessageTyped(role, text) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
  
     let i = 0;
-    // Faster: bigger chunks, shorter delay
-    const chunkSize = Math.max(2, Math.round(text.length / 60));
-    const speed = 6;
+    // Smooth, steady pace — quick but not jarring
+    const chunkSize = Math.max(2, Math.round(text.length / 45));
+    const speed = 10;
  
     function typeStep() {
       i += chunkSize;
@@ -668,3 +668,5 @@ async function callBackend(messages) {
   return data.reply;
 }
  
+
+
