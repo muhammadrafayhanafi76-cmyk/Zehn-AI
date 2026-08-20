@@ -6,12 +6,12 @@
 <title>Zehn AI — Your AI Assistant</title>
 <meta name="description" content="Zehn AI is a fast, free general-purpose AI assistant — chat, code, write, and get up-to-date answers with web search built in.">
 <meta name="theme-color" content="#0E0E14">
-
+ 
 <!-- Open Graph / social preview -->
 <meta property="og:title" content="Zehn AI — Your AI Assistant">
 <meta property="og:description" content="A fast, free AI assistant for chatting, coding, writing, and up-to-date answers.">
 <meta property="og:type" content="website">
-
+ 
 <!-- Twitter card -->
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Zehn AI — Your AI Assistant">
@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
+ 
 <!-- ===== Splash Screen ===== -->
 <div class="splash-screen" id="splashScreen">
   <div class="splash-logo">
@@ -37,14 +37,14 @@
   </div>
   <div class="splash-name">Zehn <span class="gradient-text">AI</span></div>
 </div>
-
+ 
 <!-- Animated background blobs -->
 <div class="bg-fx">
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
   <div class="blob blob-3"></div>
 </div>
-
+ 
 <div class="login-screen" id="loginScreen">
   <div class="login-card">
     <div class="brand-mark login-mark">
@@ -71,9 +71,9 @@
     <p class="login-disclaimer">By continuing, you agree to use Zehn AI responsibly.</p>
   </div>
 </div>
-
+ 
 <div class="app-shell hidden" id="appShell">
-
+ 
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-top">
       <div class="brand">
@@ -94,11 +94,11 @@
         New Chat
       </button>
     </div>
-
+ 
     <div class="history-list" id="historyList">
       <p class="suggestions-label">Recent chats</p>
     </div>
-
+ 
     <div class="sidebar-bottom">
       <div class="user-row" id="userRow">
         <img id="userPhoto" class="user-photo" src="" alt="">
@@ -109,7 +109,7 @@
       </div>
     </div>
   </aside>
-
+ 
   <main class="chat-main">
     <header class="chat-header">
       <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
@@ -126,7 +126,7 @@
         </svg>
       </span>
     </header>
-
+ 
     <div class="chat-window" id="chatWindow" aria-live="polite">
       <div class="welcome-screen" id="welcomeScreen">
         <div class="welcome-mark floaty">
@@ -149,7 +149,7 @@
         </div>
       </div>
     </div>
-
+ 
     <form class="input-bar" id="inputForm">
       <textarea id="userInput" placeholder="Message Zehn AI..." rows="1" autocomplete="off"></textarea>
       <button type="submit" id="sendBtn" aria-label="Send message">
@@ -159,11 +159,11 @@
     <p class="disclaimer">Zehn AI can make mistakes — please verify important information.</p>
   </main>
 </div>
-
+ 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
+ 
   const firebaseConfig = {
     apiKey: "AIzaSyDNCq3tkwJKUyIGfqkzQYVgXTg0O6WQmUw",
     authDomain: "zehn-ai-4a334.firebaseapp.com",
@@ -172,25 +172,26 @@
     messagingSenderId: "22810554990",
     appId: "1:22810554990:web:469ed1eb4b8a0337ec2c7f"
   };
-
+ 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const provider = new GoogleAuthProvider();
-
+ 
   window.firebaseAuth = auth;
-
+ 
   window.zehnLogin = () => signInWithPopup(auth, provider).catch((err) => {
     console.error("Login error:", err);
     alert("Login failed: " + err.message);
   });
-
+ 
   window.zehnLogout = () => signOut(auth);
-
+ 
   onAuthStateChanged(auth, (user) => {
     if (window.onZehnAuthChange) window.onZehnAuthChange(user);
   });
 </script>
-
+ 
 <script src="script.js"></script>
 </body>
 </html>
+ 
