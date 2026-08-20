@@ -15,6 +15,8 @@ const SEARCH_MODEL = "groq/compound-mini";
  
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
+
+
  
 const SYSTEM_INSTRUCTION = `You are "Zehn AI" — a helpful, intelligent, general-purpose AI assistant used by people worldwide.
 You help with anything: answering questions, coding, writing, translation, explanations, math, research, and general guidance.
