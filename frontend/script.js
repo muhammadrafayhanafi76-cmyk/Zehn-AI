@@ -1,5 +1,5 @@
  // ===== CONFIG =====
-const BACKEND_URL = "https://zehn-ai-backend.vercel.app";
+const BACKEND_URL = "https://zehn-ai-backend.muhammadrafayhanafi76.workers.dev";
  
 // Mirror of backend's search trigger keywords (for showing "Searching the web..." live)
 const SEARCH_TRIGGERS = [
