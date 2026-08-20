@@ -5,7 +5,10 @@ const cors = require("cors");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
- 
+
+
+
+
 // Two models:
 // - MAIN_MODEL: fast, high-quality general model (no built-in search)
 // - SEARCH_MODEL: Groq's Compound Mini system — has built-in web search,
