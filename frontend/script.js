@@ -1,7 +1,6 @@
  // ===== CONFIG =====
 const BACKEND_URL = "https://zehn-ai-backend.muhammadrafayhanafi76.workers.dev";
  
-// Mirror of backend's search trigger keywords (for showing "Searching the web..." live)
 const SEARCH_TRIGGERS = [
   "today", "latest", "current", "currently", "now", "recent", "news",
   "score", "weather", "price", "stock", "who is the", "when is", "when did",
@@ -27,13 +26,11 @@ function looksLikeSearch(text) {
   return SEARCH_TRIGGERS.some((kw) => lower.includes(kw));
 }
  
-// ===== State =====
 let currentUser = null;
 let allChats = [];
 let activeChatId = null;
 let isLoading = false;
  
-// ===== DOM refs =====
 const splashScreen = document.getElementById("splashScreen");
 const loginScreen = document.getElementById("loginScreen");
 const appShell = document.getElementById("appShell");
@@ -54,7 +51,6 @@ const headerTitle = document.getElementById("headerTitle");
 const statusDot = document.getElementById("statusDot");
 const historyList = document.getElementById("historyList");
  
-// ===== Online / offline detection =====
 const wifiIcon = document.getElementById("wifiIcon");
  
 function updateConnectionStatus() {
@@ -72,10 +68,8 @@ window.addEventListener("online", updateConnectionStatus);
 window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
  
-// Remove splash from the DOM after its animation finishes
 setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 1600);
  
-// ===== Auth wiring =====
 googleLoginBtn.addEventListener("click", () => {
   googleLoginBtn.disabled = true;
   googleLoginBtn.innerHTML = `<span class="btn-spinner"></span> Signing in...`;
@@ -114,9 +108,8 @@ window.onZehnAuthChange = (user) => {
   }
 };
  
-// ===== localStorage helpers =====
 function storageKey() {
-  return "zehn_chats_" + (currentUser ? currentUser.uid : "guest");
+  return "nexis_chats_" + (currentUser ? currentUser.uid : "guest");
 }
  
 function loadChatsFromStorage() {
@@ -140,7 +133,6 @@ function getActiveChat() {
   return allChats.find((c) => c.id === activeChatId);
 }
  
-// ===== Sidebar history rendering =====
 function renderHistoryList() {
   historyList.innerHTML = '<p class="suggestions-label">Recent chats</p>';
   allChats.forEach((chat) => {
@@ -213,7 +205,6 @@ function renameChat(id, itemEl) {
   });
 }
  
-// ===== Chat lifecycle =====
 function startNewChat() {
   const newChat = { id: "chat_" + Date.now(), title: "New chat", messages: [] };
   allChats.unshift(newChat);
@@ -247,7 +238,6 @@ function renderMessages() {
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
  
-// ===== Auto-resize textarea =====
 userInput.addEventListener("input", () => {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 160) + "px";
@@ -264,15 +254,13 @@ sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   sidebar.classList.toggle("open");
   syncSidebarOverlay();
-  localStorage.setItem("zehn_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
+  localStorage.setItem("nexis_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
 });
  
-// Restore sidebar state on desktop
-if (window.innerWidth > 760 && localStorage.getItem("zehn_sidebar_collapsed") === "1") {
+if (window.innerWidth > 760 && localStorage.getItem("nexis_sidebar_collapsed") === "1") {
   sidebar.classList.add("collapsed");
 }
  
-// ===== Mobile: tap outside sidebar to close it =====
 const sidebarOverlay = document.createElement("div");
 sidebarOverlay.className = "sidebar-overlay";
 document.body.appendChild(sidebarOverlay);
@@ -290,7 +278,6 @@ sidebarOverlay.addEventListener("click", () => {
   syncSidebarOverlay();
 });
  
-// ===== Mobile: swipe gestures to open/close sidebar =====
 let touchStartX = 0;
 let touchStartY = 0;
  
@@ -300,46 +287,40 @@ document.addEventListener("touchstart", (e) => {
 }, { passive: true });
  
 document.addEventListener("touchend", (e) => {
-  if (window.innerWidth > 760) return; // only on mobile widths
+  if (window.innerWidth > 760) return;
  
   const touchEndX = e.changedTouches[0].clientX;
   const touchEndY = e.changedTouches[0].clientY;
   const deltaX = touchEndX - touchStartX;
   const deltaY = touchEndY - touchStartY;
  
-  // Ignore mostly-vertical swipes (scrolling)
   if (Math.abs(deltaY) > Math.abs(deltaX)) return;
  
   const isOpen = sidebar.classList.contains("open");
  
-  // Swipe right from near the left edge to open
   if (!isOpen && touchStartX < 40 && deltaX > 60) {
     sidebar.classList.add("open");
     syncSidebarOverlay();
   }
  
-  // Swipe left anywhere while open to close
   if (isOpen && deltaX < -60) {
     sidebar.classList.remove("open");
     syncSidebarOverlay();
   }
 }, { passive: true });
  
-// Auto-focus input when typing anywhere on the page
 document.addEventListener("keydown", (e) => {
   const active = document.activeElement;
   const isTyping = active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT");
   const isModifier = e.ctrlKey || e.metaKey || e.altKey;
   const isPrintable = e.key.length === 1;
  
-  // Ctrl/Cmd + N -> new chat
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n" && !appShell.classList.contains("hidden")) {
     e.preventDefault();
     startNewChat();
     return;
   }
  
-  // Escape -> close mobile sidebar, blur input
   if (e.key === "Escape") {
     sidebar.classList.remove("open");
     syncSidebarOverlay();
@@ -360,7 +341,6 @@ document.addEventListener("click", (e) => {
   }
 });
  
-// ===== Send message =====
 inputForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = userInput.value.trim();
@@ -404,7 +384,7 @@ inputForm.addEventListener("submit", async (e) => {
     if (!navigator.onLine) {
       friendlyMessage = "⚠️ You're offline. Please check your internet connection and try again.";
     } else if (err.message && err.message.toLowerCase().includes("fetch")) {
-      friendlyMessage = "⚠️ Couldn't reach Zehn AI's server. This is usually an internet connection issue — please check your connection and try again. If your internet is working fine, the backend server may not be running.";
+      friendlyMessage = "⚠️ Couldn't reach Nexis AI's server. This is usually an internet connection issue — please check your connection and try again. If your internet is working fine, the backend server may not be running.";
     } else {
       friendlyMessage = "⚠️ Something went wrong: " + err.message;
     }
@@ -490,7 +470,6 @@ function addMessage(role, text, time) {
   return row;
 }
  
-// ===== Status indicator: "Searching the web..." or "Thinking..." with blinking avatar =====
 function addStatusIndicator(isSearching) {
   const row = document.createElement("div");
   row.className = "message-row assistant";
@@ -509,7 +488,6 @@ function addStatusIndicator(isSearching) {
   return row;
 }
  
-// ===== Typing animation render (fast) =====
 function addMessageTyped(role, text) {
   return new Promise((resolve) => {
     const row = document.createElement("div");
@@ -531,7 +509,6 @@ function addMessageTyped(role, text) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
  
     let i = 0;
-    // Smooth, steady pace — quick but not jarring
     const chunkSize = Math.max(2, Math.round(text.length / 45));
     const speed = 10;
  
@@ -562,7 +539,6 @@ function escapeOnly(text) {
 function formatText(text) {
   let escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
  
-  // Fenced code blocks (with copy button)
   let codeBlockIndex = 0;
   const codeBlocks = [];
   escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
@@ -570,20 +546,16 @@ function formatText(text) {
     return `__CODEBLOCK_${codeBlockIndex++}__`;
   });
  
-  // Headings
   escaped = escaped.replace(/^### (.+)$/gm, "<h4>$1</h4>");
   escaped = escaped.replace(/^## (.+)$/gm, "<h3>$1</h3>");
   escaped = escaped.replace(/^# (.+)$/gm, "<h2>$1</h2>");
  
-  // Bold / inline code
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
  
-  // Bullet lists
   escaped = escaped.replace(/^(?:- |\* )(.+)$/gm, "<li>$1</li>");
   escaped = escaped.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
  
-  // Restore code blocks with copy button wrapper
   codeBlocks.forEach((code, i) => {
     const escapedCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const block = `<div class="code-block"><button class="copy-code-btn" data-code="${encodeURIComponent(code)}">Copy</button><pre><code>${escapedCode}</code></pre></div>`;
@@ -593,12 +565,10 @@ function formatText(text) {
   return escaped;
 }
  
-// ===== Regenerate last assistant response =====
 async function regenerateResponse(rowEl) {
   const chat = getActiveChat();
   if (!chat || isLoading) return;
  
-  // Remove the last assistant message from data + DOM
   const lastMsg = chat.messages[chat.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return;
   chat.messages.pop();
@@ -626,7 +596,6 @@ async function regenerateResponse(rowEl) {
   }
 }
  
-// ===== Copy-code button delegation (works for all code blocks) =====
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".copy-code-btn");
   if (!btn) return;
@@ -638,7 +607,6 @@ document.addEventListener("click", (e) => {
   });
 });
  
-// ===== Scroll-to-bottom floating button =====
 const scrollBtn = document.createElement("button");
 scrollBtn.className = "scroll-bottom-btn";
 scrollBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -668,5 +636,11 @@ async function callBackend(messages) {
   return data.reply;
 }
  
+
+
+
+
+
+
 
 
