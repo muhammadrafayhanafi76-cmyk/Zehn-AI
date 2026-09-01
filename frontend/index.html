@@ -161,6 +161,10 @@
   </main>
 </div>
  
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  emailjs.init({ publicKey: "ySI_C0JKZetbLzPez" });
+</script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -180,10 +184,13 @@
  
   window.firebaseAuth = auth;
  
-  window.zehnLogin = () => signInWithPopup(auth, provider).catch((err) => {
-    console.error("Login error:", err);
-    alert("Login failed: " + err.message);
-  });
+  window.zehnLogin = () => signInWithPopup(auth, provider)
+    .then((result) => result)
+    .catch((err) => {
+      console.error("Login error:", err);
+      alert("Login failed: " + err.message);
+      return null;
+    });
  
   window.zehnLogout = () => signOut(auth);
  
