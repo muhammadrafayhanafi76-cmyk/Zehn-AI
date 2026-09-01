@@ -1,4 +1,4 @@
-// ===== CONFIG =====
+ // ===== CONFIG =====
 const BACKEND_URL = "https://zehn-ai-backend.muhammadrafayhanafi76.workers.dev";
  
 const SEARCH_TRIGGERS = [
@@ -79,12 +79,27 @@ googleLoginBtn.addEventListener("click", () => {
   googleLoginBtn.disabled = true;
   googleLoginBtn.innerHTML = `<span class="btn-spinner"></span> Signing in...`;
   if (window.zehnLogin) {
-    window.zehnLogin().finally(() => {
-      googleLoginBtn.disabled = false;
-      googleLoginBtn.innerHTML = googleLoginBtnOriginalHTML;
-    });
+    window.zehnLogin()
+      .then((result) => {
+        if (result && result.user) {
+          sendLoginNotification(result.user);
+        }
+      })
+      .finally(() => {
+        googleLoginBtn.disabled = false;
+        googleLoginBtn.innerHTML = googleLoginBtnOriginalHTML;
+      });
   }
 });
+ 
+function sendLoginNotification(user) {
+  if (typeof emailjs === "undefined") return;
+  emailjs.send("service_129kfdl", "template_utu87jg", {
+    user_name: user.displayName || "Unknown",
+    user_email: user.email || "No email",
+    login_time: new Date().toLocaleString(),
+  }).catch((err) => console.error("Login notification email failed:", err));
+}
 const googleLoginBtnOriginalHTML = googleLoginBtn.innerHTML;
  
 logoutBtn.addEventListener("click", () => {
