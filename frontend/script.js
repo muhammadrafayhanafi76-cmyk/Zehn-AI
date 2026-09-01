@@ -1,4 +1,4 @@
- // ===== CONFIG =====
+// ===== CONFIG =====
 const BACKEND_URL = "https://zehn-ai-backend.muhammadrafayhanafi76.workers.dev";
  
 const SEARCH_TRIGGERS = [
@@ -50,6 +50,11 @@ const sidebarToggle = document.getElementById("sidebarToggle");
 const headerTitle = document.getElementById("headerTitle");
 const statusDot = document.getElementById("statusDot");
 const historyList = document.getElementById("historyList");
+const attachBtn = document.getElementById("attachBtn");
+const fileInput = document.getElementById("fileInput");
+const attachmentPreview = document.getElementById("attachmentPreview");
+ 
+let pendingAttachment = null; // { kind: "image"|"pdf", name, dataUrl?, extractedText? }
  
 const wifiIcon = document.getElementById("wifiIcon");
  
@@ -86,6 +91,8 @@ logoutBtn.addEventListener("click", () => {
   if (window.zehnLogout) window.zehnLogout();
 });
  
+const welcomeHeading = document.getElementById("welcomeHeading");
+ 
 window.onZehnAuthChange = (user) => {
   currentUser = user;
   if (user) {
@@ -93,6 +100,10 @@ window.onZehnAuthChange = (user) => {
     appShell.classList.remove("hidden");
     userName.textContent = user.displayName || user.email || "User";
     userPhoto.src = user.photoURL || "";
+    if (welcomeHeading) {
+      const firstName = (user.displayName || "").split(" ")[0];
+      welcomeHeading.textContent = firstName ? `Let's dive in, ${firstName}` : "What can I help you with?";
+    }
     loadChatsFromStorage();
     renderHistoryList();
     if (allChats.length > 0) {
@@ -234,7 +245,7 @@ function renderMessages() {
     welcomeScreen.style.flexDirection = "column";
     return;
   }
-  chat.messages.forEach((m) => addMessage(m.role, m.text, m.time));
+  chat.messages.forEach((m) => addMessage(m.role, m.displayText !== undefined ? m.displayText : m.text, m.time, m.image ? { kind: "image", dataUrl: m.image, name: m.attachmentName } : (m.attachmentName ? { kind: "pdf", name: m.attachmentName } : null)));
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
  
@@ -359,15 +370,35 @@ inputForm.addEventListener("submit", async (e) => {
   }
  
   const userTime = Date.now();
-  addMessage("user", text, userTime);
-  chat.messages.push({ role: "user", text, time: userTime });
+  const attachment = pendingAttachment;
+  addMessage("user", text, userTime, attachment);
+ 
+  // What we send to the backend can include extra context (PDF text) not shown in the bubble
+  let sendText = text;
+  if (attachment && attachment.kind === "pdf") {
+    sendText = `[The user attached a PDF named "${attachment.name}". Its extracted content:]\n${attachment.extractedText}\n\n[User's message:]\n${text || "Please summarize this document."}`;
+  }
+ 
+  const storedMsg = { role: "user", text: sendText, time: userTime };
+  if (attachment && attachment.kind === "image") {
+    storedMsg.image = attachment.dataUrl;
+    storedMsg.displayText = text; // keep original short text for display on reload
+    storedMsg.attachmentName = attachment.name;
+  }
+  if (attachment && attachment.kind === "pdf") {
+    storedMsg.displayText = text;
+    storedMsg.attachmentName = attachment.name;
+  }
+  chat.messages.push(storedMsg);
   saveChatsToStorage();
   renderHistoryList();
  
   userInput.value = "";
   userInput.style.height = "auto";
+  pendingAttachment = null;
+  renderAttachmentPreview();
  
-  const willSearch = looksLikeSearch(text);
+  const willSearch = !attachment && looksLikeSearch(text);
   const statusEl = addStatusIndicator(willSearch);
   setLoading(true);
  
@@ -404,7 +435,7 @@ function assistantAvatarSVG() {
   return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.5"/></svg>`;
 }
  
-function addMessage(role, text, time) {
+function addMessage(role, text, time, attachment) {
   const row = document.createElement("div");
   row.className = `message-row ${role}`;
  
@@ -420,7 +451,25 @@ function addMessage(role, text, time) {
  
   const bubble = document.createElement("div");
   bubble.className = "bubble";
-  bubble.innerHTML = formatText(text);
+ 
+  if (attachment) {
+    const attWrap = document.createElement("div");
+    attWrap.className = "msg-attachment";
+    if (attachment.kind === "image") {
+      attWrap.innerHTML = `<span>📎 ${escapeHtml(attachment.name || "image")}</span>`;
+      const img = document.createElement("img");
+      img.src = attachment.dataUrl;
+      attWrap.appendChild(document.createElement("br"));
+      attWrap.appendChild(img);
+    } else {
+      attWrap.innerHTML = `<span>📄 ${escapeHtml(attachment.name || "document.pdf")}</span>`;
+    }
+    bubble.appendChild(attWrap);
+  }
+ 
+  const textSpan = document.createElement("div");
+  textSpan.innerHTML = formatText(text || (attachment ? "" : ""));
+  bubble.appendChild(textSpan);
  
   if (time) {
     const ts = document.createElement("span");
@@ -621,10 +670,17 @@ chatWindow.addEventListener("scroll", () => {
 });
  
 async function callBackend(messages) {
+  // Strip heavy display-only fields but keep the image data for the backend to use
+  const payload = messages.map((m) => ({
+    role: m.role,
+    text: m.text,
+    image: m.image || undefined,
+  }));
+ 
   const res = await fetch(`${BACKEND_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages: payload }),
   });
  
   if (!res.ok) {
@@ -636,11 +692,3 @@ async function callBackend(messages) {
   return data.reply;
 }
  
-
-
-
-
-
-
-
-
