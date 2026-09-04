@@ -684,22 +684,29 @@ function addMessageTyped(role, text) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
  
     let i = 0;
-    const chunkSize = Math.max(2, Math.round(text.length / 45));
-    const speed = 10;
+    // Word-based reveal reads more naturally and feels smoother than character chunks
+    const words = text.split(/(\s+)/); // keep whitespace tokens so spacing is preserved
+    const wordsPerStep = words.length > 200 ? 3 : words.length > 80 ? 2 : 1;
+    const speed = 22;
+    let atBottom = true;
+ 
+    chatWindow.addEventListener("scroll", () => {
+      atBottom = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 80;
+    }, { passive: true });
  
     function typeStep() {
-      i += chunkSize;
-      const shown = text.slice(0, i);
+      i += wordsPerStep;
+      const shown = words.slice(0, i).join("");
       bubble.innerHTML = escapeOnly(shown);
       bubble.appendChild(cursor);
-      chatWindow.scrollTop = chatWindow.scrollHeight;
+      if (atBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
  
-      if (i < text.length) {
-        setTimeout(typeStep, speed);
+      if (i < words.length) {
+        requestAnimationFrame(() => setTimeout(typeStep, speed));
       } else {
         bubble.innerHTML = formatText(text);
         avatar.classList.remove("is-thinking");
-        chatWindow.scrollTop = chatWindow.scrollHeight;
+        if (atBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
         resolve(row);
       }
     }
