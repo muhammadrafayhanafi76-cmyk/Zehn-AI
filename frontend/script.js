@@ -367,6 +367,117 @@ document.addEventListener("click", (e) => {
   }
 });
  
+// ===== File attachment handling =====
+attachBtn.addEventListener("click", () => fileInput.click());
+ 
+fileInput.addEventListener("change", async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+ 
+  const isImage = file.type.startsWith("image/");
+  const isPdf = file.type === "application/pdf";
+ 
+  if (!isImage && !isPdf) {
+    alert("Please attach an image or a PDF file.");
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    alert("File is too large. Please attach a file under 8MB.");
+    return;
+  }
+ 
+  if (isImage) {
+    const dataUrl = await fileToDataUrl(file);
+    pendingAttachment = { kind: "image", name: file.name, dataUrl };
+  } else {
+    const text = await extractPdfText(file);
+    if (!text) {
+      alert("Couldn't read that PDF. It may be scanned/image-based, which isn't supported yet.");
+      return;
+    }
+    pendingAttachment = { kind: "pdf", name: file.name, extractedText: text };
+  }
+ 
+  renderAttachmentPreview();
+});
+ 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+ 
+let pdfJsLoaded = false;
+function loadPdfJs() {
+  if (pdfJsLoaded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      pdfJsLoaded = true;
+      resolve();
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+ 
+async function extractPdfText(file) {
+  try {
+    await loadPdfJs();
+    const buffer = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+    let fullText = "";
+    const maxPages = Math.min(pdf.numPages, 15);
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText += content.items.map((it) => it.str).join(" ") + "\n\n";
+      if (fullText.length > 12000) break;
+    }
+    return fullText.trim().slice(0, 12000);
+  } catch (err) {
+    console.error("PDF extraction failed:", err);
+    return null;
+  }
+}
+ 
+function renderAttachmentPreview() {
+  attachmentPreview.innerHTML = "";
+  attachBtn.classList.toggle("has-file", !!pendingAttachment);
+  if (!pendingAttachment) return;
+ 
+  const chip = document.createElement("div");
+  chip.className = "attachment-chip";
+ 
+  if (pendingAttachment.kind === "image") {
+    chip.innerHTML = `<img src="${pendingAttachment.dataUrl}" alt="">`;
+  } else {
+    chip.innerHTML = `<span class="file-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 1.5h5l3 3v8a0.5 0.5 0 01-0.5 0.5h-7.5a0.5 0.5 0 01-0.5-0.5v-10.5a0.5 0.5 0 01.5-0.5z" stroke="currentColor" stroke-width="1.1"/></svg></span>`;
+  }
+ 
+  const label = document.createElement("span");
+  label.textContent = pendingAttachment.name.length > 24 ? pendingAttachment.name.slice(0, 24) + "…" : pendingAttachment.name;
+  chip.appendChild(label);
+ 
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "remove-attachment";
+  removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+  removeBtn.addEventListener("click", () => {
+    pendingAttachment = null;
+    renderAttachmentPreview();
+  });
+  chip.appendChild(removeBtn);
+ 
+  attachmentPreview.appendChild(chip);
+}
+ 
+// ===== Send message =====
 inputForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = userInput.value.trim();
