@@ -6,7 +6,7 @@ const FREE_DAILY_LIMIT = 20; // messages per day for free users
 const ADMIN_PASS_CODE = "NEXIS200"; // <-- change this line + redeploy whenever you want to rotate the code
 const PASS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PASS_PRICE_TEXT = "Rs. 200 for 24-hour unlimited access";
-const PASS_CONTACT_TEXT = "JazzCash/Easypaisa:03008992418 "; // <-- put your real number here
+const PASS_CONTACT_TEXT = "JazzCash/Easypaisa:03008992418"; // <-- put your real number here
 
 const SEARCH_TRIGGERS = [
   "today", "latest", "current", "currently", "now", "recent", "news",
@@ -780,6 +780,10 @@ function addStatusIndicator(isSearching) {
   return row;
 }
 
+// FIXED: no more duplicate scroll listener added on every call (was causing progressive
+// slowdown — each assistant reply used to stack ANOTHER "scroll" listener onto chatWindow
+// forever). Also switched from full innerHTML rebuild every word to a single text node
+// update, which is much cheaper and removes the stutter.
 function addMessageTyped(role, text) {
   return new Promise((resolve) => {
     const row = document.createElement("div");
@@ -791,8 +795,10 @@ function addMessageTyped(role, text) {
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
+    const textNode = document.createTextNode("");
     const cursor = document.createElement("span");
     cursor.className = "cursor-blink";
+    bubble.appendChild(textNode);
     bubble.appendChild(cursor);
 
     row.appendChild(avatar);
@@ -800,30 +806,26 @@ function addMessageTyped(role, text) {
     chatWindow.appendChild(row);
     chatWindow.scrollTop = chatWindow.scrollHeight;
 
-    let i = 0;
-    // Word-by-word reveal, one word per step, for a calmer ChatGPT-like pace
     const words = text.split(/(\s+)/); // keep whitespace tokens so spacing is preserved
-    const wordsPerStep = 1;
-    const speed = 42;
-    let atBottom = true;
+    const speed = 35; // ms per word — single timer, no rAF wrapping, so pacing stays consistent
+    let i = 0;
 
-    chatWindow.addEventListener("scroll", () => {
-      atBottom = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 80;
-    }, { passive: true });
+    function isNearBottom() {
+      return chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 80;
+    }
 
     function typeStep() {
-      i += wordsPerStep;
-      const shown = words.slice(0, i).join("");
-      bubble.innerHTML = escapeOnly(shown);
-      bubble.appendChild(cursor);
-      if (atBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
+      const wasNearBottom = isNearBottom();
+      i += 1;
+      textNode.textContent = words.slice(0, i).join("");
+      if (wasNearBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
 
       if (i < words.length) {
-        requestAnimationFrame(() => setTimeout(typeStep, speed));
+        setTimeout(typeStep, speed);
       } else {
         bubble.innerHTML = formatText(text);
         avatar.classList.remove("is-thinking");
-        if (atBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
+        if (wasNearBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
         resolve(row);
       }
     }
