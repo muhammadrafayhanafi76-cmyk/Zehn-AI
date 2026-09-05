@@ -1,6 +1,13 @@
  // ===== CONFIG =====
 const BACKEND_URL = "https://zehn-ai-backend.muhammadrafayhanafi76.workers.dev";
- 
+
+// ===== Monetization: Free daily limit + Pass code system =====
+const FREE_DAILY_LIMIT = 20; // messages per day for free users
+const ADMIN_PASS_CODE = "NEXIS200"; // <-- change this line + redeploy whenever you want to rotate the code
+const PASS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PASS_PRICE_TEXT = "Rs. 200 for 24-hour unlimited access";
+const PASS_CONTACT_TEXT = "JazzCash/Easypaisa: 0300-0000000"; // <-- put your real number here
+
 const SEARCH_TRIGGERS = [
   "today", "latest", "current", "currently", "now", "recent", "news",
   "score", "weather", "price", "stock", "who is the", "when is", "when did",
@@ -17,20 +24,20 @@ const SEARCH_TRIGGERS = [
   "t20", "odi", "test series", "prime minister", "president of",
   "ceo of", "new movie", "box office"
 ];
- 
+
 const YEAR_PATTERN = /\b(202[3-9]|203[0-9])\b/;
- 
+
 function looksLikeSearch(text) {
   const lower = text.toLowerCase();
   if (YEAR_PATTERN.test(text)) return true;
   return SEARCH_TRIGGERS.some((kw) => lower.includes(kw));
 }
- 
+
 let currentUser = null;
 let allChats = [];
 let activeChatId = null;
 let isLoading = false;
- 
+
 const splashScreen = document.getElementById("splashScreen");
 const loginScreen = document.getElementById("loginScreen");
 const appShell = document.getElementById("appShell");
@@ -38,7 +45,7 @@ const googleLoginBtn = document.getElementById("googleLoginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const userPhoto = document.getElementById("userPhoto");
 const userName = document.getElementById("userName");
- 
+
 const chatWindow = document.getElementById("chatWindow");
 const welcomeScreen = document.getElementById("welcomeScreen");
 const inputForm = document.getElementById("inputForm");
@@ -53,11 +60,11 @@ const historyList = document.getElementById("historyList");
 const attachBtn = document.getElementById("attachBtn");
 const fileInput = document.getElementById("fileInput");
 const attachmentPreview = document.getElementById("attachmentPreview");
- 
+
 let pendingAttachment = null; // { kind: "image"|"pdf", name, dataUrl?, extractedText? }
- 
+
 const wifiIcon = document.getElementById("wifiIcon");
- 
+
 function updateConnectionStatus() {
   if (!navigator.onLine) {
     statusDot.classList.add("offline");
@@ -72,9 +79,9 @@ function updateConnectionStatus() {
 window.addEventListener("online", updateConnectionStatus);
 window.addEventListener("offline", updateConnectionStatus);
 updateConnectionStatus();
- 
+
 setTimeout(() => { if (splashScreen) splashScreen.remove(); }, 1600);
- 
+
 googleLoginBtn.addEventListener("click", () => {
   googleLoginBtn.disabled = true;
   googleLoginBtn.innerHTML = `<span class="btn-spinner"></span> Signing in...`;
@@ -91,7 +98,7 @@ googleLoginBtn.addEventListener("click", () => {
       });
   }
 });
- 
+
 function sendLoginNotification(user) {
   if (typeof emailjs === "undefined") return;
   emailjs.send("service_129kfdl", "template_utu87jg", {
@@ -101,13 +108,13 @@ function sendLoginNotification(user) {
   }).catch((err) => console.error("Login notification email failed:", err));
 }
 const googleLoginBtnOriginalHTML = googleLoginBtn.innerHTML;
- 
+
 logoutBtn.addEventListener("click", () => {
   if (window.zehnLogout) window.zehnLogout();
 });
- 
+
 const welcomeHeading = document.getElementById("welcomeHeading");
- 
+
 window.onZehnAuthChange = (user) => {
   currentUser = user;
   if (user) {
@@ -126,6 +133,7 @@ window.onZehnAuthChange = (user) => {
     } else {
       startNewChat();
     }
+    renderPassStatus();
   } else {
     loginScreen.classList.remove("hidden");
     appShell.classList.add("hidden");
@@ -133,11 +141,11 @@ window.onZehnAuthChange = (user) => {
     activeChatId = null;
   }
 };
- 
+
 function storageKey() {
   return "nexis_chats_" + (currentUser ? currentUser.uid : "guest");
 }
- 
+
 function loadChatsFromStorage() {
   try {
     const raw = localStorage.getItem(storageKey());
@@ -146,7 +154,7 @@ function loadChatsFromStorage() {
     allChats = [];
   }
 }
- 
+
 function saveChatsToStorage() {
   try {
     localStorage.setItem(storageKey(), JSON.stringify(allChats));
@@ -154,11 +162,11 @@ function saveChatsToStorage() {
     console.error("Could not save chat history:", e);
   }
 }
- 
+
 function getActiveChat() {
   return allChats.find((c) => c.id === activeChatId);
 }
- 
+
 function renderHistoryList() {
   historyList.innerHTML = '<p class="suggestions-label">Recent chats</p>';
   allChats.forEach((chat) => {
@@ -185,11 +193,11 @@ function renderHistoryList() {
     historyList.appendChild(item);
   });
 }
- 
+
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
- 
+
 function deleteChat(id) {
   allChats = allChats.filter((c) => c.id !== id);
   saveChatsToStorage();
@@ -203,7 +211,7 @@ function deleteChat(id) {
     renderHistoryList();
   }
 }
- 
+
 function renameChat(id, itemEl) {
   const chat = allChats.find((c) => c.id === id);
   if (!chat) return;
@@ -215,7 +223,7 @@ function renameChat(id, itemEl) {
   titleSpan.replaceWith(input);
   input.focus();
   input.select();
- 
+
   function commit() {
     const newTitle = input.value.trim();
     chat.title = newTitle || chat.title;
@@ -223,14 +231,14 @@ function renameChat(id, itemEl) {
     renderHistoryList();
     if (id === activeChatId) headerTitle.textContent = chat.title;
   }
- 
+
   input.addEventListener("blur", commit);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); input.blur(); }
     if (e.key === "Escape") { input.value = chat.title; input.blur(); }
   });
 }
- 
+
 function startNewChat() {
   const newChat = { id: "chat_" + Date.now(), title: "New chat", messages: [] };
   allChats.unshift(newChat);
@@ -240,7 +248,7 @@ function startNewChat() {
   renderMessages();
   headerTitle.textContent = "New Conversation";
 }
- 
+
 function openChat(id) {
   activeChatId = id;
   renderHistoryList();
@@ -248,9 +256,9 @@ function openChat(id) {
   const chat = getActiveChat();
   headerTitle.textContent = chat && chat.title ? chat.title : "New Conversation";
 }
- 
+
 newChatBtn.addEventListener("click", startNewChat);
- 
+
 function renderMessages() {
   chatWindow.innerHTML = "";
   const chat = getActiveChat();
@@ -263,34 +271,34 @@ function renderMessages() {
   chat.messages.forEach((m) => addMessage(m.role, m.displayText !== undefined ? m.displayText : m.text, m.time, m.image ? { kind: "image", dataUrl: m.image, name: m.attachmentName } : (m.attachmentName ? { kind: "pdf", name: m.attachmentName } : null)));
   chatWindow.scrollTop = chatWindow.scrollHeight;
 }
- 
+
 userInput.addEventListener("input", () => {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 160) + "px";
 });
- 
+
 userInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     inputForm.requestSubmit();
   }
 });
- 
+
 sidebarToggle.addEventListener("click", () => {
   sidebar.classList.toggle("collapsed");
   sidebar.classList.toggle("open");
   syncSidebarOverlay();
   localStorage.setItem("nexis_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "1" : "0");
 });
- 
+
 if (window.innerWidth > 760 && localStorage.getItem("nexis_sidebar_collapsed") === "1") {
   sidebar.classList.add("collapsed");
 }
- 
+
 const sidebarOverlay = document.createElement("div");
 sidebarOverlay.className = "sidebar-overlay";
 document.body.appendChild(sidebarOverlay);
- 
+
 function syncSidebarOverlay() {
   if (sidebar.classList.contains("open") && window.innerWidth <= 760) {
     sidebarOverlay.classList.add("visible");
@@ -298,67 +306,67 @@ function syncSidebarOverlay() {
     sidebarOverlay.classList.remove("visible");
   }
 }
- 
+
 sidebarOverlay.addEventListener("click", () => {
   sidebar.classList.remove("open");
   syncSidebarOverlay();
 });
- 
+
 let touchStartX = 0;
 let touchStartY = 0;
- 
+
 document.addEventListener("touchstart", (e) => {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
 }, { passive: true });
- 
+
 document.addEventListener("touchend", (e) => {
   if (window.innerWidth > 760) return;
- 
+
   const touchEndX = e.changedTouches[0].clientX;
   const touchEndY = e.changedTouches[0].clientY;
   const deltaX = touchEndX - touchStartX;
   const deltaY = touchEndY - touchStartY;
- 
+
   if (Math.abs(deltaY) > Math.abs(deltaX)) return;
- 
+
   const isOpen = sidebar.classList.contains("open");
- 
+
   if (!isOpen && touchStartX < 40 && deltaX > 60) {
     sidebar.classList.add("open");
     syncSidebarOverlay();
   }
- 
+
   if (isOpen && deltaX < -60) {
     sidebar.classList.remove("open");
     syncSidebarOverlay();
   }
 }, { passive: true });
- 
+
 document.addEventListener("keydown", (e) => {
   const active = document.activeElement;
   const isTyping = active && (active.tagName === "TEXTAREA" || active.tagName === "INPUT");
   const isModifier = e.ctrlKey || e.metaKey || e.altKey;
   const isPrintable = e.key.length === 1;
- 
+
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n" && !appShell.classList.contains("hidden")) {
     e.preventDefault();
     startNewChat();
     return;
   }
- 
+
   if (e.key === "Escape") {
     sidebar.classList.remove("open");
     syncSidebarOverlay();
     userInput.blur();
     return;
   }
- 
+
   if (!isTyping && !isModifier && isPrintable && !appShell.classList.contains("hidden")) {
     userInput.focus();
   }
 });
- 
+
 document.addEventListener("click", (e) => {
   const chip = e.target.closest(".suggestion-chip");
   if (chip) {
@@ -366,18 +374,18 @@ document.addEventListener("click", (e) => {
     inputForm.requestSubmit();
   }
 });
- 
+
 // ===== File attachment handling =====
 attachBtn.addEventListener("click", () => fileInput.click());
- 
+
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files[0];
   fileInput.value = "";
   if (!file) return;
- 
+
   const isImage = file.type.startsWith("image/");
   const isPdf = file.type === "application/pdf";
- 
+
   if (!isImage && !isPdf) {
     alert("Please attach an image or a PDF file.");
     return;
@@ -386,7 +394,7 @@ fileInput.addEventListener("change", async () => {
     alert("File is too large. Please attach a file under 8MB.");
     return;
   }
- 
+
   if (isImage) {
     const dataUrl = await fileToDataUrl(file);
     pendingAttachment = { kind: "image", name: file.name, dataUrl };
@@ -398,10 +406,10 @@ fileInput.addEventListener("change", async () => {
     }
     pendingAttachment = { kind: "pdf", name: file.name, extractedText: text };
   }
- 
+
   renderAttachmentPreview();
 });
- 
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -410,7 +418,7 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
- 
+
 let pdfJsLoaded = false;
 function loadPdfJs() {
   if (pdfJsLoaded) return Promise.resolve();
@@ -426,7 +434,7 @@ function loadPdfJs() {
     document.head.appendChild(script);
   });
 }
- 
+
 async function extractPdfText(file) {
   try {
     await loadPdfJs();
@@ -446,25 +454,25 @@ async function extractPdfText(file) {
     return null;
   }
 }
- 
+
 function renderAttachmentPreview() {
   attachmentPreview.innerHTML = "";
   attachBtn.classList.toggle("has-file", !!pendingAttachment);
   if (!pendingAttachment) return;
- 
+
   const chip = document.createElement("div");
   chip.className = "attachment-chip";
- 
+
   if (pendingAttachment.kind === "image") {
     chip.innerHTML = `<img src="${pendingAttachment.dataUrl}" alt="">`;
   } else {
     chip.innerHTML = `<span class="file-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 1.5h5l3 3v8a0.5 0.5 0 01-0.5 0.5h-7.5a0.5 0.5 0 01-0.5-0.5v-10.5a0.5 0.5 0 01.5-0.5z" stroke="currentColor" stroke-width="1.1"/></svg></span>`;
   }
- 
+
   const label = document.createElement("span");
   label.textContent = pendingAttachment.name.length > 24 ? pendingAttachment.name.slice(0, 24) + "…" : pendingAttachment.name;
   chip.appendChild(label);
- 
+
   const removeBtn = document.createElement("button");
   removeBtn.className = "remove-attachment";
   removeBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
@@ -473,38 +481,145 @@ function renderAttachmentPreview() {
     renderAttachmentPreview();
   });
   chip.appendChild(removeBtn);
- 
+
   attachmentPreview.appendChild(chip);
 }
- 
+
+// ===== Monetization helpers =====
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function msgCountKey() {
+  return "nexis_msgcount_" + (currentUser ? currentUser.uid : "guest") + "_" + todayStr();
+}
+
+function passKey() {
+  return "nexis_pass_" + (currentUser ? currentUser.uid : "guest");
+}
+
+function getMessageCountToday() {
+  return parseInt(localStorage.getItem(msgCountKey()) || "0", 10);
+}
+
+function incrementMessageCount() {
+  const count = getMessageCountToday() + 1;
+  localStorage.setItem(msgCountKey(), String(count));
+  return count;
+}
+
+function isPassActive() {
+  try {
+    const raw = localStorage.getItem(passKey());
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    return data.expiresAt && Date.now() < data.expiresAt;
+  } catch (e) {
+    return false;
+  }
+}
+
+function passExpiresAt() {
+  try {
+    const raw = localStorage.getItem(passKey());
+    if (!raw) return null;
+    return JSON.parse(raw).expiresAt || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function redeemPassCode(code) {
+  if (code.trim() === ADMIN_PASS_CODE) {
+    const expiresAt = Date.now() + PASS_DURATION_MS;
+    localStorage.setItem(passKey(), JSON.stringify({ expiresAt }));
+    renderPassStatus();
+    alert("Pass activated! Aapko 24 ghante ke liye unlimited access mil gaya hai.");
+    return true;
+  }
+  alert("Ye code sahi nahi hai. Please check karein ya seller se dobara poochein.");
+  return false;
+}
+
+function canSendMessage() {
+  if (isPassActive()) return true;
+  return getMessageCountToday() < FREE_DAILY_LIMIT;
+}
+
+function remainingFreeMessages() {
+  return Math.max(0, FREE_DAILY_LIMIT - getMessageCountToday());
+}
+
+// Inject a "Pass status" row + redeem button into the sidebar bottom
+function renderPassStatus() {
+  const sidebarBottom = document.querySelector(".sidebar-bottom");
+  if (!sidebarBottom) return;
+
+  let passRow = document.getElementById("passStatusRow");
+  if (!passRow) {
+    passRow = document.createElement("div");
+    passRow.id = "passStatusRow";
+    passRow.style.cssText = "padding:8px 6px; margin-top:6px; border-top:1px solid var(--border-subtle);";
+    sidebarBottom.appendChild(passRow);
+  }
+
+  if (isPassActive()) {
+    const hoursLeft = Math.max(0, Math.ceil((passExpiresAt() - Date.now()) / (60 * 60 * 1000)));
+    passRow.innerHTML = `<div style="font-size:12px; color:var(--accent); font-weight:600;">✓ Unlimited Pass active (~${hoursLeft}h left)</div>`;
+  } else {
+    const remaining = remainingFreeMessages();
+    passRow.innerHTML = `
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px;">${remaining} free messages left today</div>
+      <button id="redeemPassBtn" style="width:100%; background:var(--accent); color:#fff; border:none; padding:8px 10px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer;">Redeem Pass Code</button>
+    `;
+    document.getElementById("redeemPassBtn").addEventListener("click", () => {
+      const code = prompt(`${PASS_PRICE_TEXT}\n${PASS_CONTACT_TEXT}\n\nPayment ke baad seller se code mangwayein aur yahan enter karein:`);
+      if (code) redeemPassCode(code);
+    });
+  }
+}
+
 // ===== Send message =====
 inputForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = userInput.value.trim();
   if (!text || isLoading) return;
- 
+
+  if (!canSendMessage()) {
+    if (welcomeScreen.parentElement === chatWindow) {
+      chatWindow.innerHTML = "";
+    }
+    addMessage("assistant",
+      `🚫 Aaj ki free limit (${FREE_DAILY_LIMIT} messages) khatam ho gayi hai.\n\n${PASS_PRICE_TEXT}\n${PASS_CONTACT_TEXT}\n\nPayment ke baad seller se code lein aur sidebar mein "Redeem Pass Code" button se activate karein.`,
+      Date.now()
+    );
+    userInput.value = "";
+    return;
+  }
+
   if (!activeChatId) startNewChat();
   const chat = getActiveChat();
- 
+
   if (welcomeScreen.parentElement === chatWindow) {
     chatWindow.innerHTML = "";
   }
- 
+
   if (chat.messages.length === 0) {
     chat.title = text.length > 30 ? text.slice(0, 30) + "…" : text;
     headerTitle.textContent = chat.title;
   }
- 
+
   const userTime = Date.now();
   const attachment = pendingAttachment;
   addMessage("user", text, userTime, attachment);
- 
+
   // What we send to the backend can include extra context (PDF text) not shown in the bubble
   let sendText = text;
   if (attachment && attachment.kind === "pdf") {
     sendText = `[The user attached a PDF named "${attachment.name}". Its extracted content:]\n${attachment.extractedText}\n\n[User's message:]\n${text || "Please summarize this document."}`;
   }
- 
+
   const storedMsg = { role: "user", text: sendText, time: userTime };
   if (attachment && attachment.kind === "image") {
     storedMsg.image = attachment.dataUrl;
@@ -518,16 +633,16 @@ inputForm.addEventListener("submit", async (e) => {
   chat.messages.push(storedMsg);
   saveChatsToStorage();
   renderHistoryList();
- 
+
   userInput.value = "";
   userInput.style.height = "auto";
   pendingAttachment = null;
   renderAttachmentPreview();
- 
+
   const willSearch = !attachment && looksLikeSearch(text);
   const statusEl = addStatusIndicator(willSearch);
   setLoading(true);
- 
+
   try {
     const reply = await callBackend(chat.messages);
     statusEl.remove();
@@ -535,6 +650,8 @@ inputForm.addEventListener("submit", async (e) => {
     chat.messages.push({ role: "assistant", text: reply, time: Date.now() });
     saveChatsToStorage();
     statusDot.classList.remove("offline");
+    incrementMessageCount();
+    renderPassStatus();
   } catch (err) {
     statusEl.remove();
     let friendlyMessage;
@@ -551,20 +668,20 @@ inputForm.addEventListener("submit", async (e) => {
     setLoading(false);
   }
 });
- 
+
 function setLoading(state) {
   isLoading = state;
   sendBtn.disabled = state;
 }
- 
+
 function assistantAvatarSVG() {
   return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="4" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="6" r="2" fill="currentColor" opacity="0.5"/><circle cx="4" cy="18" r="2" fill="currentColor" opacity="0.5"/><circle cx="20" cy="18" r="2" fill="currentColor" opacity="0.5"/></svg>`;
 }
- 
+
 function addMessage(role, text, time, attachment) {
   const row = document.createElement("div");
   row.className = `message-row ${role}`;
- 
+
   const avatar = document.createElement("div");
   avatar.className = "avatar";
   if (role === "assistant") {
@@ -574,10 +691,10 @@ function addMessage(role, text, time, attachment) {
   } else {
     avatar.innerHTML = `<span>You</span>`;
   }
- 
+
   const bubble = document.createElement("div");
   bubble.className = "bubble";
- 
+
   if (attachment) {
     const attWrap = document.createElement("div");
     attWrap.className = "msg-attachment";
@@ -592,18 +709,18 @@ function addMessage(role, text, time, attachment) {
     }
     bubble.appendChild(attWrap);
   }
- 
+
   const textSpan = document.createElement("div");
   textSpan.innerHTML = formatText(text || (attachment ? "" : ""));
   bubble.appendChild(textSpan);
- 
+
   if (time) {
     const ts = document.createElement("span");
     ts.className = "msg-time";
     ts.textContent = new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     bubble.appendChild(ts);
   }
- 
+
   if (role === "assistant") {
     row.appendChild(avatar);
     row.appendChild(bubble);
@@ -611,11 +728,11 @@ function addMessage(role, text, time, attachment) {
     row.appendChild(bubble);
     row.appendChild(avatar);
   }
- 
+
   if (role === "assistant") {
     const actionsRow = document.createElement("div");
     actionsRow.className = "msg-actions";
- 
+
     const copyBtn = document.createElement("button");
     copyBtn.className = "msg-action-btn";
     copyBtn.title = "Copy response";
@@ -628,23 +745,23 @@ function addMessage(role, text, time, attachment) {
         }, 1500);
       });
     });
- 
+
     const regenBtn = document.createElement("button");
     regenBtn.className = "msg-action-btn";
     regenBtn.title = "Regenerate response";
     regenBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5a4.5 4.5 0 0 1 7.5-3.3M11 6.5a4.5 4.5 0 0 1-7.5 3.3M9 2v2h-2M4 11v-2h2" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     regenBtn.addEventListener("click", () => regenerateResponse(row));
- 
+
     actionsRow.appendChild(copyBtn);
     actionsRow.appendChild(regenBtn);
     bubble.appendChild(actionsRow);
   }
- 
+
   chatWindow.appendChild(row);
   chatWindow.scrollTop = chatWindow.scrollHeight;
   return row;
 }
- 
+
 function addStatusIndicator(isSearching) {
   const row = document.createElement("div");
   row.className = "message-row assistant";
@@ -662,45 +779,45 @@ function addStatusIndicator(isSearching) {
   chatWindow.scrollTop = chatWindow.scrollHeight;
   return row;
 }
- 
+
 function addMessageTyped(role, text) {
   return new Promise((resolve) => {
     const row = document.createElement("div");
     row.className = `message-row ${role}`;
- 
+
     const avatar = document.createElement("div");
     avatar.className = "avatar is-thinking";
     avatar.innerHTML = assistantAvatarSVG();
- 
+
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     const cursor = document.createElement("span");
     cursor.className = "cursor-blink";
     bubble.appendChild(cursor);
- 
+
     row.appendChild(avatar);
     row.appendChild(bubble);
     chatWindow.appendChild(row);
     chatWindow.scrollTop = chatWindow.scrollHeight;
- 
+
     let i = 0;
     // Word-by-word reveal, one word per step, for a calmer ChatGPT-like pace
     const words = text.split(/(\s+)/); // keep whitespace tokens so spacing is preserved
     const wordsPerStep = 1;
     const speed = 42;
     let atBottom = true;
- 
+
     chatWindow.addEventListener("scroll", () => {
       atBottom = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 80;
     }, { passive: true });
- 
+
     function typeStep() {
       i += wordsPerStep;
       const shown = words.slice(0, i).join("");
       bubble.innerHTML = escapeOnly(shown);
       bubble.appendChild(cursor);
       if (atBottom) chatWindow.scrollTop = chatWindow.scrollHeight;
- 
+
       if (i < words.length) {
         requestAnimationFrame(() => setTimeout(typeStep, speed));
       } else {
@@ -713,55 +830,55 @@ function addMessageTyped(role, text) {
     typeStep();
   });
 }
- 
+
 function escapeOnly(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
- 
+
 function formatText(text) {
   let escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
- 
+
   let codeBlockIndex = 0;
   const codeBlocks = [];
   escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
     codeBlocks.push(code.trim());
     return `__CODEBLOCK_${codeBlockIndex++}__`;
   });
- 
+
   escaped = escaped.replace(/^### (.+)$/gm, "<h4>$1</h4>");
   escaped = escaped.replace(/^## (.+)$/gm, "<h3>$1</h3>");
   escaped = escaped.replace(/^# (.+)$/gm, "<h2>$1</h2>");
- 
+
   escaped = escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
- 
+
   escaped = escaped.replace(/^(?:- |\* )(.+)$/gm, "<li>$1</li>");
   escaped = escaped.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
- 
+
   codeBlocks.forEach((code, i) => {
     const escapedCode = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const block = `<div class="code-block"><button class="copy-code-btn" data-code="${encodeURIComponent(code)}">Copy</button><pre><code>${escapedCode}</code></pre></div>`;
     escaped = escaped.replace(`__CODEBLOCK_${i}__`, block);
   });
- 
+
   return escaped;
 }
- 
+
 async function regenerateResponse(rowEl) {
   const chat = getActiveChat();
   if (!chat || isLoading) return;
- 
+
   const lastMsg = chat.messages[chat.messages.length - 1];
   if (!lastMsg || lastMsg.role !== "assistant") return;
   chat.messages.pop();
   rowEl.remove();
   saveChatsToStorage();
- 
+
   const lastUser = [...chat.messages].reverse().find((m) => m.role === "user");
   const willSearch = lastUser ? looksLikeSearch(lastUser.text) : false;
   const statusEl = addStatusIndicator(willSearch);
   setLoading(true);
- 
+
   try {
     const reply = await callBackend(chat.messages);
     statusEl.remove();
@@ -777,7 +894,7 @@ async function regenerateResponse(rowEl) {
     setLoading(false);
   }
 }
- 
+
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".copy-code-btn");
   if (!btn) return;
@@ -788,7 +905,7 @@ document.addEventListener("click", (e) => {
     setTimeout(() => { btn.textContent = original; }, 1500);
   });
 });
- 
+
 const scrollBtn = document.createElement("button");
 scrollBtn.className = "scroll-bottom-btn";
 scrollBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -796,12 +913,12 @@ scrollBtn.addEventListener("click", () => {
   chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: "smooth" });
 });
 document.querySelector(".chat-main").appendChild(scrollBtn);
- 
+
 chatWindow.addEventListener("scroll", () => {
   const nearBottom = chatWindow.scrollHeight - chatWindow.scrollTop - chatWindow.clientHeight < 120;
   scrollBtn.classList.toggle("visible", !nearBottom);
 });
- 
+
 async function callBackend(messages) {
   // Strip heavy display-only fields but keep the image data for the backend to use
   const payload = messages.map((m) => ({
@@ -809,18 +926,18 @@ async function callBackend(messages) {
     text: m.text,
     image: m.image || undefined,
   }));
- 
+
   const res = await fetch(`${BACKEND_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages: payload }),
   });
- 
+
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
     throw new Error(errBody.error || `Server error (${res.status})`);
   }
- 
+
   const data = await res.json();
   return data.reply;
 }
