@@ -6,7 +6,7 @@ const FREE_DAILY_LIMIT = 20; // messages per day for free users
 const ADMIN_PASS_CODE = "NEXIS200"; // <-- change this line + redeploy whenever you want to rotate the code
 const PASS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PASS_PRICE_TEXT = "Rs. 200 for 24-hour unlimited access";
-const PASS_CONTACT_TEXT = "JazzCash/Easypaisa: "; // <-- put your real number here
+const PASS_CONTACT_TEXT = "JazzCash/Easypaisa:03008992418 "; // <-- put your real number here
 
 const SEARCH_TRIGGERS = [
   "today", "latest", "current", "currently", "now", "recent", "news",
